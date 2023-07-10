@@ -9,6 +9,7 @@ import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import com.kdownloader.internal.stream.FileDownloadOutputStream
 import com.kdownloader.internal.stream.FileDownloadRandomAccessFile
+import com.kdownloader.internal.stream.FileDownloadUri
 import com.kdownloader.utils.isUriPath
 import java.io.*
 
@@ -20,9 +21,36 @@ const val FILE_ALLOCATION_ERROR = "file_allocation_error"
 
 //region OutputStream
 fun getDownloadOutputStream(
-    filePath: String, contentResolver: ContentResolver
+    filePath: String,
+    contentResolver: ContentResolver
 ): FileDownloadOutputStream {
-    return FileDownloadRandomAccessFile.create(File(filePath))
+    return if (filePath.isUriPath()) {
+        getDownloadOutputStream(Uri.parse(filePath), contentResolver)
+    } else {
+        FileDownloadRandomAccessFile.create(File(filePath))
+    }
+}
+
+fun getDownloadOutputStream(
+    fileUri: Uri,
+    contentResolver: ContentResolver
+): FileDownloadOutputStream {
+    return when (fileUri.scheme) {
+        ContentResolver.SCHEME_FILE -> {
+            val file = File(fileUri.path ?: fileUri.toString())
+            if (file.exists() && file.canWrite()) {
+                FileDownloadRandomAccessFile.create(file)
+            } else {
+                FileDownloadUri.create(contentResolver, fileUri)
+            }
+        }
+        ContentResolver.SCHEME_CONTENT -> {
+            FileDownloadUri.create(contentResolver, fileUri)
+        }
+        else -> {
+            throw FileNotFoundException("$fileUri $FILE_NOT_FOUND")
+        }
+    }
 }
 //endregion
 

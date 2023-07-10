@@ -1,6 +1,7 @@
 package com.kdownloader
 
 import android.content.Context
+import android.net.Uri
 import com.kdownloader.database.AppDbHelper
 import com.kdownloader.database.DbHelper
 import com.kdownloader.database.NoOpsDbHelper
@@ -33,6 +34,12 @@ class KDownloader private constructor(
 
     fun newRequestBuilder(url: String, dirPath: String, fileName: String): DownloadRequest.Builder {
         return DownloadRequest.Builder(url, File(dirPath, fileName))
+            .readTimeout(config.readTimeOut)
+            .connectTimeout(config.connectTimeOut)
+    }
+
+    fun newRequestBuilder(url: String, uri: Uri): DownloadRequest.Builder {
+        return DownloadRequest.Builder(url, uri.toString())
             .readTimeout(config.readTimeOut)
             .connectTimeout(config.connectTimeOut)
     }
