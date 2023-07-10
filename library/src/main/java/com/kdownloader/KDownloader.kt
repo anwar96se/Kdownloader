@@ -7,8 +7,13 @@ import com.kdownloader.database.NoOpsDbHelper
 import com.kdownloader.internal.DownloadDispatchers
 import com.kdownloader.internal.DownloadRequest
 import com.kdownloader.internal.DownloadRequestQueue
+import java.io.File
 
-class KDownloader private constructor(dbHelper: DbHelper, private val config: DownloaderConfig) {
+class KDownloader private constructor(
+    context: Context,
+    dbHelper: DbHelper,
+    private val config: DownloaderConfig
+) {
 
     companion object {
         fun create(
@@ -16,18 +21,18 @@ class KDownloader private constructor(dbHelper: DbHelper, private val config: Do
             config: DownloaderConfig = DownloaderConfig(true)
         ): KDownloader {
             return if (config.databaseEnabled) {
-                KDownloader(AppDbHelper(context), config)
+                KDownloader(context, AppDbHelper(context), config)
             } else {
-                KDownloader(NoOpsDbHelper(),config)
+                KDownloader(context, NoOpsDbHelper(), config)
             }
         }
     }
 
-    private val downloader = DownloadDispatchers(dbHelper)
+    private val downloader = DownloadDispatchers(dbHelper, context)
     private val reqQueue = DownloadRequestQueue(downloader)
 
     fun newRequestBuilder(url: String, dirPath: String, fileName: String): DownloadRequest.Builder {
-        return DownloadRequest.Builder(url, dirPath, fileName)
+        return DownloadRequest.Builder(url, File(dirPath, fileName))
             .readTimeout(config.readTimeOut)
             .connectTimeout(config.connectTimeOut)
     }

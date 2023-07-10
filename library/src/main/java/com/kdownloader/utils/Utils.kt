@@ -1,9 +1,9 @@
 package com.kdownloader.utils
 
 import com.kdownloader.Constants
-import com.kdownloader.internal.DownloadRequest
 import com.kdownloader.httpclient.DefaultHttpClient
 import com.kdownloader.httpclient.HttpClient
+import com.kdownloader.internal.DownloadRequest
 import java.io.File
 import java.io.IOException
 import java.io.UnsupportedEncodingException
@@ -18,29 +18,13 @@ fun getPath(dirPath: String, fileName: String): String {
     return dirPath + File.separator + fileName
 }
 
-fun getTempPath(dirPath: String, fileName: String): String {
-    return getPath(dirPath, fileName) + ".temp"
-}
+val String.withTemp: String get() = if (isUriPath()) this else "$this.temp"
 
-@Throws(IOException::class)
-fun renameFileName(oldPath: String, newPath: String) {
-    val oldFile = File(oldPath)
-    try {
-        val newFile = File(newPath)
-        if (newFile.exists()) {
-            if (!newFile.delete()) {
-                throw IOException("Deletion Failed")
-            }
-        }
-        if (!oldFile.renameTo(newFile)) {
-            throw IOException("Rename Failed")
-        }
-    } finally {
-        if (oldFile.exists()) {
-            oldFile.delete()
-        }
-    }
-}
+fun String.isUriPath(): Boolean =
+    isNotEmpty() && (startsWith("content://") || startsWith("file://"))
+
+fun String.isContentPath(): Boolean =
+    isNotEmpty() && startsWith("content://")
 
 private fun isRedirection(code: Int): Boolean {
     return code == HttpURLConnection.HTTP_MOVED_PERM
@@ -78,8 +62,8 @@ fun getRedirectedConnectionIfAny(
     return httpClient
 }
 
-fun getUniqueId(url: String, dirPath: String, fileName: String): Int {
-    val string = url + File.separator + dirPath + File.separator + fileName
+fun getUniqueId(url: String, filePath: String): Int {
+    val string = url + File.separator + filePath
     val hash: ByteArray = try {
         MessageDigest.getInstance("MD5").digest(string.toByteArray(charset("UTF-8")))
     } catch (e: NoSuchAlgorithmException) {
@@ -93,10 +77,4 @@ fun getUniqueId(url: String, dirPath: String, fileName: String): Int {
         hex.append(Integer.toHexString((b and 0xFF.toByte()).toInt()))
     }
     return hex.toString().hashCode()
-}
-
-fun deleteFile(req: DownloadRequest) {
-    val path = getTempPath(req.dirPath, req.fileName)
-    val file = File(path)
-    file.delete()
 }

@@ -4,15 +4,16 @@ import com.kdownloader.Constants
 import com.kdownloader.Status
 import com.kdownloader.utils.getUniqueId
 import kotlinx.coroutines.Job
+import java.io.File
 
 class DownloadRequest private constructor(
     internal var url: String,
     internal val tag: String?,
     internal var listener: Listener?,
     internal val headers: HashMap<String, List<String>>?,
-    internal val dirPath: String,
+    internal val filePath: String,
     internal val downloadId: Int,
-    internal val fileName: String,
+    internal var enqueueAction: Int,
     internal var status: Status = Status.UNKNOWN,
     internal var readTimeOut: Int = 0,
     internal var connectTimeOut: Int = 0,
@@ -24,12 +25,16 @@ class DownloadRequest private constructor(
     internal lateinit var job: Job
 
     data class Builder(
-        private val url: String, private val dirPath: String, private val fileName: String
+        private val url: String,
+        private val filePath: String,
     ) {
+
+        constructor(url: String, file: File) : this(url, file.absolutePath)
 
         private var tag: String? = null
         private var listener: Listener? = null
         private var headers: HashMap<String, List<String>>? = null
+        private var enqueueAction: Int = 1
         private var readTimeOut: Int = Constants.DEFAULT_READ_TIMEOUT_IN_MILLS
         private var connectTimeOut: Int = Constants.DEFAULT_CONNECT_TIMEOUT_IN_MILLS
         private var userAgent: String = Constants.DEFAULT_USER_AGENT
@@ -40,6 +45,10 @@ class DownloadRequest private constructor(
 
         fun headers(headers: HashMap<String, List<String>>) = apply {
             this.headers = headers
+        }
+
+        fun increment(increment: Boolean = true) = apply {
+            this.enqueueAction = if (increment) 1 else 0
         }
 
         fun readTimeout(timeout: Int) = apply {
@@ -60,9 +69,9 @@ class DownloadRequest private constructor(
                 tag = tag,
                 listener = listener,
                 headers = headers,
-                dirPath = dirPath,
-                downloadId = getUniqueId(url, dirPath, fileName),
-                fileName = fileName,
+                filePath = filePath,
+                downloadId = getUniqueId(url, filePath),
+                enqueueAction = enqueueAction,
                 readTimeOut = readTimeOut,
                 connectTimeOut = connectTimeOut,
                 userAgent = userAgent
@@ -78,7 +87,7 @@ class DownloadRequest private constructor(
         fun onError(error: String)
     }
 
-    fun reset(){
+    fun reset() {
         downloadedBytes = 0
         totalBytes = 0
         status = Status.UNKNOWN

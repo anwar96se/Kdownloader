@@ -1,5 +1,6 @@
 package com.kdownloader.internal
 
+import android.content.Context
 import com.kdownloader.Constants
 import com.kdownloader.Status
 import com.kdownloader.database.AppDbHelper
@@ -7,23 +8,24 @@ import com.kdownloader.database.DbHelper
 import com.kdownloader.database.DownloadModel
 import com.kdownloader.httpclient.DefaultHttpClient
 import com.kdownloader.httpclient.HttpClient
+import com.kdownloader.internal.storage.DefaultStorageResolver
+import com.kdownloader.internal.storage.StorageResolver
 import com.kdownloader.internal.stream.FileDownloadOutputStream
-import com.kdownloader.internal.stream.FileDownloadRandomAccessFile
-import com.kdownloader.utils.getPath
 import com.kdownloader.utils.getRedirectedConnectionIfAny
-import com.kdownloader.utils.getTempPath
-import com.kdownloader.utils.renameFileName
+import com.kdownloader.utils.isContentPath
+import com.kdownloader.utils.withTemp
 import kotlinx.coroutines.*
-import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
 
 class DownloadTask(
     private val req: DownloadRequest,
-    private val dbHelper: DbHelper
+    private val dbHelper: DbHelper,
+    context: Context,
 ) {
 
+    private val storage: StorageResolver = DefaultStorageResolver(context)
     private var responseCode = 0
     private var totalBytes: Long = 0
     private var inputStream: InputStream? = null
@@ -91,20 +93,17 @@ class DownloadTask(
 
         withContext(Dispatchers.IO) {
             try {
-                tempPath = getTempPath(req.dirPath, req.fileName)
-                var file = File(tempPath)
+                tempPath = req.filePath.withTemp
+                val increment = req.enqueueAction == 1
 
                 var model = getDownloadModelIfAlreadyPresentInDatabase()
 
-                if (model == null && file.exists() && dbHelper is AppDbHelper) {
-                    if (!deleteTempFile()) {
-                        tempPath = tempPath.split(".")[0] + "2." + tempPath.split(".", limit = 2)[1]
-                        file = File(tempPath)
-                    }
+                if (model == null && storage.fileExists(tempPath) && dbHelper is AppDbHelper) {
+                    if (!increment) deleteTempFile()
                 }
 
                 if (model != null) {
-                    if (file.exists()) {
+                    if (storage.fileExists(tempPath)) {
                         req.totalBytes = (model.totalBytes)
                         req.downloadedBytes = (model.downloadedBytes)
                     } else {
@@ -162,18 +161,8 @@ class DownloadTask(
 
                 val buff = ByteArray(BUFFER_SIZE)
 
-                if (!file.exists()) {
-                    val parentFile = file.parentFile
-                    if (parentFile != null && !parentFile.exists()) {
-                        if (parentFile.mkdirs()) {
-                            file.createNewFile()
-                        }
-                    } else {
-                        file.createNewFile()
-                    }
-                }
-
-                this@DownloadTask.outputStream = FileDownloadRandomAccessFile.create(file)
+                tempPath = storage.createFile(tempPath, increment)
+                outputStream = storage.getDownloadOutputStream(tempPath)
 
                 if (req.status === Status.CANCELLED) {
                     deleteTempFile()
@@ -207,12 +196,7 @@ class DownloadTask(
                         return@withContext
                     }
 
-                    if (!isActive) {
-                        deleteTempFile()
-                        req.reset()
-                        break
-                    }
-                    if (!req.job.isActive) {
+                    if (!isActive || !req.job.isActive) {
                         deleteTempFile()
                         req.reset()
                         break
@@ -241,8 +225,12 @@ class DownloadTask(
                     return@withContext
                 }
 
-                val path = getPath(req.dirPath, req.fileName)
-                renameFileName(tempPath, path)
+                if (!tempPath.isContentPath()) {
+                    val path = storage.createFile(req.filePath, increment)
+                    storage.renameFile(tempPath, path)
+                    deleteTempFile()
+                }
+                // TODO: pass saved file path onCompleted
                 listener.onCompleted()
                 req.status = Status.COMPLETED
                 return@withContext
@@ -271,11 +259,7 @@ class DownloadTask(
     }
 
     private fun deleteTempFile(): Boolean {
-        val file = File(tempPath)
-        if (file.exists()) {
-            return file.delete()
-        }
-        return false
+        return storage.deleteFile(tempPath)
     }
 
     @Throws(IOException::class, IllegalAccessException::class)

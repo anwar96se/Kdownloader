@@ -1,13 +1,17 @@
 package com.kdownloader.internal
 
+import android.content.Context
 import com.kdownloader.Status
 import com.kdownloader.database.DbHelper
 import com.kdownloader.database.DownloadModel
-import com.kdownloader.utils.getTempPath
+import com.kdownloader.internal.storage.DefaultStorageResolver
+import com.kdownloader.utils.getPath
 import kotlinx.coroutines.*
-import java.io.File
 
-class DownloadDispatchers(private val dbHelper: DbHelper) {
+class DownloadDispatchers(
+    private val dbHelper: DbHelper,
+    private val context: Context
+) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main +
             CoroutineExceptionHandler { _, _ ->
@@ -28,7 +32,7 @@ class DownloadDispatchers(private val dbHelper: DbHelper) {
     }
 
     private suspend fun execute(request: DownloadRequest) {
-        DownloadTask(request, dbHelper).run(
+        DownloadTask(request, dbHelper, context).run(
             onStart = {
                 executeOnMainThread { request.listener?.onStart() }
             },
@@ -56,11 +60,7 @@ class DownloadDispatchers(private val dbHelper: DbHelper) {
     fun cancel(req: DownloadRequest) {
 
         if (req.status == Status.PAUSED) {
-            val tempPath = getTempPath(req.dirPath, req.fileName)
-            val file = File(tempPath)
-            if (file.exists()) {
-                file.delete()
-            }
+            DefaultStorageResolver(context).deleteFile(req.filePath)
             req.reset()
         }
 
@@ -86,15 +86,12 @@ class DownloadDispatchers(private val dbHelper: DbHelper) {
             val models: List<DownloadModel>? = dbHelper.getUnwantedModels(days)
             if (models != null) {
                 for (model in models) {
-                    val tempPath: String = getTempPath(
+                    val filePath: String = getPath(
                         model.dirPath,
                         model.fileName
                     )
                     dbHelper.remove(model.id)
-                    val file = File(tempPath)
-                    if (file.exists()) {
-                        file.delete()
-                    }
+                    DefaultStorageResolver(context).deleteFile(filePath)
                 }
             }
         }
