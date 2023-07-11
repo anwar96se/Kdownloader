@@ -8,6 +8,8 @@ import com.kdownloader.database.NoOpsDbHelper
 import com.kdownloader.internal.DownloadDispatchers
 import com.kdownloader.internal.DownloadRequest
 import com.kdownloader.internal.DownloadRequestQueue
+import com.kdownloader.internal.listener.DownloadListener
+import com.kdownloader.internal.listener.ListenerReference
 import java.io.File
 
 class KDownloader private constructor(
@@ -44,7 +46,7 @@ class KDownloader private constructor(
             .connectTimeout(config.connectTimeOut)
     }
 
-    fun enqueue(req: DownloadRequest, listener: DownloadRequest.Listener): Int {
+    fun enqueue(req: DownloadRequest, listener: DownloadListener): Int {
         req.listener = listener
         return reqQueue.enqueue(req)
     }
@@ -52,16 +54,18 @@ class KDownloader private constructor(
     inline fun enqueue(
         req: DownloadRequest,
         crossinline onStart: () -> Unit = {},
-        crossinline onProgress: (value: Int) -> Unit = { _ -> },
+        crossinline onProgress: (total: Long, downloaded: Long, progress: Int) -> Unit = { _, _, _ -> },
         crossinline onPause: () -> Unit = {},
         crossinline onError: (error: String) -> Unit = { _ -> },
-        crossinline onCompleted: () -> Unit = {}
-    ) = enqueue(req, object : DownloadRequest.Listener {
-        override fun onStart() = onStart()
-        override fun onProgress(value: Int) = onProgress(value)
-        override fun onPause() = onPause()
-        override fun onError(error: String) = onError(error)
-        override fun onCompleted() = onCompleted()
+        crossinline onCompleted: (path: String) -> Unit = {}
+    ) = enqueue(req, object : DownloadListener {
+        override fun onStart(req: DownloadRequest) = onStart()
+        override fun onProgress(req: DownloadRequest, progress: Int) =
+            onProgress(req.totalBytes, req.downloadedBytes, progress)
+
+        override fun onPause(req: DownloadRequest) = onPause()
+        override fun onError(req: DownloadRequest, error: String) = onError(error)
+        override fun onCompleted(req: DownloadRequest, path: String) = onCompleted(path)
     })
 
     fun status(id: Int): Status {
@@ -92,5 +96,33 @@ class KDownloader private constructor(
         downloader.cleanup(days)
 
     }
+
+    inline fun addListener(
+        requestId: Int? = null,
+        removeOnFinish: Boolean = false,
+        crossinline onStart: () -> Unit = {},
+        crossinline onProgress: (total: Long, downloaded: Long, progress: Int) -> Unit = { _, _, _ -> },
+        crossinline onPause: () -> Unit = {},
+        crossinline onError: (error: String) -> Unit = { _ -> },
+        crossinline onCompleted: (path: String) -> Unit = {}
+    ) = addListener(
+        ListenerReference(
+            requestId = requestId,
+            removeOnFinish = removeOnFinish,
+            listener = object : DownloadListener {
+                override fun onStart(req: DownloadRequest) = onStart()
+                override fun onProgress(req: DownloadRequest, progress: Int) =
+                    onProgress(req.totalBytes, req.downloadedBytes, progress)
+
+                override fun onPause(req: DownloadRequest) = onPause()
+                override fun onCompleted(req: DownloadRequest, path: String) = onCompleted(path)
+                override fun onError(req: DownloadRequest, error: String) = onError(error)
+            })
+    )
+
+    fun addListener(listener: ListenerReference) =
+        downloader.appListener.addListener(listener)
+
+    fun removeListener(listenerId: Int) = downloader.appListener.removeListener(listenerId)
 
 }

@@ -2,6 +2,7 @@ package com.kdownloader.internal
 
 import com.kdownloader.Constants
 import com.kdownloader.Status
+import com.kdownloader.internal.listener.DownloadListener
 import com.kdownloader.utils.getUniqueId
 import kotlinx.coroutines.Job
 import java.io.File
@@ -9,7 +10,7 @@ import java.io.File
 class DownloadRequest private constructor(
     internal var url: String,
     internal val tag: String?,
-    internal var listener: Listener?,
+    internal var listener: DownloadListener?,
     internal val headers: HashMap<String, List<String>>?,
     internal val filePath: String,
     internal val downloadId: Int,
@@ -32,7 +33,7 @@ class DownloadRequest private constructor(
         constructor(url: String, file: File) : this(url, file.absolutePath)
 
         private var tag: String? = null
-        private var listener: Listener? = null
+        private var listener: DownloadListener? = null
         private var headers: HashMap<String, List<String>>? = null
         private var enqueueAction: Int = 1
         private var readTimeOut: Int = Constants.DEFAULT_READ_TIMEOUT_IN_MILLS
@@ -77,14 +78,6 @@ class DownloadRequest private constructor(
                 userAgent = userAgent
             )
         }
-    }
-
-    interface Listener {
-        fun onStart()
-        fun onProgress(value: Int)
-        fun onPause()
-        fun onCompleted()
-        fun onError(error: String)
     }
 
     fun reset() {

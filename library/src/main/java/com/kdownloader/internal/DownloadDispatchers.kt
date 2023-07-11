@@ -4,6 +4,8 @@ import android.content.Context
 import com.kdownloader.Status
 import com.kdownloader.database.DbHelper
 import com.kdownloader.database.DownloadModel
+import com.kdownloader.internal.listener.AppDownloadListener
+import com.kdownloader.internal.listener.DownloadListener
 import com.kdownloader.internal.storage.DefaultStorageResolver
 import com.kdownloader.utils.getPath
 import kotlinx.coroutines.*
@@ -23,6 +25,8 @@ class DownloadDispatchers(
 
             })
 
+    internal val appListener = AppDownloadListener()
+
     fun enqueue(req: DownloadRequest): Int {
         val job = scope.launch {
             execute(req)
@@ -32,22 +36,42 @@ class DownloadDispatchers(
     }
 
     private suspend fun execute(request: DownloadRequest) {
-        DownloadTask(request, dbHelper, context).run(
-            onStart = {
-                executeOnMainThread { request.listener?.onStart() }
-            },
-            onProgress = {
-                executeOnMainThread { request.listener?.onProgress(it) }
-            },
-            onPause = {
-                executeOnMainThread { request.listener?.onPause() }
-            },
-            onCompleted = {
-                executeOnMainThread { request.listener?.onCompleted() }
-            },
-            onError = {
-                executeOnMainThread { request.listener?.onError(it) }
+        DownloadTask(request, dbHelper, context).run(object : DownloadListener {
+            override fun onStart(req: DownloadRequest) {
+                executeOnMainThread {
+                    request.listener?.onStart(req)
+                    appListener.mainListener.onStart(req)
+                }
             }
+
+            override fun onProgress(req: DownloadRequest, progress: Int) {
+                executeOnMainThread {
+                    request.listener?.onProgress(req, progress)
+                    appListener.mainListener.onProgress(req, progress)
+                }
+            }
+
+            override fun onPause(req: DownloadRequest) {
+                executeOnMainThread {
+                    request.listener?.onPause(req)
+                    appListener.mainListener.onPause(req)
+                }
+            }
+
+            override fun onCompleted(req: DownloadRequest, path: String) {
+                executeOnMainThread {
+                    request.listener?.onCompleted(req, path)
+                    appListener.mainListener.onCompleted(req, path)
+                }
+            }
+
+            override fun onError(req: DownloadRequest, error: String) {
+                executeOnMainThread {
+                    request.listener?.onError(req, error)
+                    appListener.mainListener.onError(req, error)
+                }
+            }
+        }
         )
     }
 
@@ -67,7 +91,7 @@ class DownloadDispatchers(
         req.status = Status.CANCELLED
         req.job.cancel()
 
-        req.listener?.onError("Cancelled")
+        req.listener?.onError(req, "Cancelled")
 
         dbScope.launch {
             dbHelper.remove(req.downloadId)

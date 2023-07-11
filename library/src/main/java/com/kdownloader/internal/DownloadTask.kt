@@ -8,6 +8,7 @@ import com.kdownloader.database.DbHelper
 import com.kdownloader.database.DownloadModel
 import com.kdownloader.httpclient.DefaultHttpClient
 import com.kdownloader.httpclient.HttpClient
+import com.kdownloader.internal.listener.DownloadListener
 import com.kdownloader.internal.storage.DefaultStorageResolver
 import com.kdownloader.internal.storage.StorageResolver
 import com.kdownloader.internal.stream.FileDownloadOutputStream
@@ -51,24 +52,6 @@ class DownloadTask(
         private const val BUFFER_SIZE = 1024 * 4
     }
 
-    suspend inline fun run(
-        crossinline onStart: () -> Unit = {},
-        crossinline onProgress: (value: Int) -> Unit = { _ -> },
-        crossinline onError: (error: String) -> Unit = { _ -> },
-        crossinline onCompleted: () -> Unit = {},
-        crossinline onPause: () -> Unit = {}
-    ) = run(object : DownloadRequest.Listener {
-        override fun onStart() = onStart()
-
-        override fun onProgress(value: Int) = onProgress(value)
-
-        override fun onError(error: String) = onError(error)
-
-        override fun onCompleted() = onCompleted()
-
-        override fun onPause() = onPause()
-    })
-
     private suspend fun createAndInsertNewModel() {
 
         dbScope.launch {
@@ -89,7 +72,7 @@ class DownloadTask(
         }
     }
 
-    suspend fun run(listener: DownloadRequest.Listener) {
+    suspend fun run(listener: DownloadListener) {
 
         withContext(Dispatchers.IO) {
             try {
@@ -119,7 +102,7 @@ class DownloadTask(
 
                 req.status = Status.RUNNING
 
-                listener.onStart()
+                listener.onStart(req)
 
                 httpClient.connect(req)
 
@@ -133,7 +116,7 @@ class DownloadTask(
                 responseCode = httpClient.getResponseCode()
 
                 if (!isSuccessful()) {
-                    listener.onError("Wrong link")
+                    listener.onError(req, "Wrong link")
                 }
 
                 setResumeSupportedOrNot()
@@ -167,11 +150,11 @@ class DownloadTask(
                 if (req.status === Status.CANCELLED) {
                     deleteTempFile()
                     req.reset()
-                    listener.onError("Cancelled")
+                    listener.onError(req, "Cancelled")
                     return@withContext
                 } else if (req.status === Status.PAUSED) {
                     sync(outputStream)
-                    listener.onPause()
+                    listener.onPause(req)
                     return@withContext
                 }
 
@@ -188,11 +171,11 @@ class DownloadTask(
                     if (req.status === Status.CANCELLED) {
                         deleteTempFile()
                         req.reset()
-                        listener.onError("Cancelled")
+                        listener.onError(req, "Cancelled")
                         return@withContext
                     } else if (req.status === Status.PAUSED) {
                         sync(outputStream)
-                        listener.onPause()
+                        listener.onPause(req)
                         return@withContext
                     }
 
@@ -211,34 +194,34 @@ class DownloadTask(
                     if (totalBytes > 0) {
                         progress = ((req.downloadedBytes * 100) / totalBytes).toInt()
                     }
-                    listener.onProgress(progress)
+                    listener.onProgress(req, progress)
                 } while (true)
 
                 if (req.status === Status.CANCELLED) {
                     deleteTempFile()
                     req.reset()
-                    listener.onError("Cancelled")
+                    listener.onError(req, "Cancelled")
                     return@withContext
                 } else if (req.status === Status.PAUSED) {
                     sync(outputStream)
-                    listener.onPause()
+                    listener.onPause(req)
                     return@withContext
                 }
 
-                if (!tempPath.isContentPath()) {
+                val path = if (!tempPath.isContentPath()) {
                     val path = storage.createFile(req.filePath, increment)
                     storage.renameFile(tempPath, path)
                     deleteTempFile()
-                }
-                // TODO: pass saved file path onCompleted
-                listener.onCompleted()
+                    path
+                } else tempPath
+                listener.onCompleted(req, path)
                 req.status = Status.COMPLETED
                 return@withContext
             } catch (e: CancellationException) {
                 deleteTempFile()
                 req.reset()
                 req.status = Status.FAILED
-                listener.onError(e.toString())
+                listener.onError(req, e.toString())
                 return@withContext
             } catch (e: Exception) {
                 if (!isResumeSupported) {
@@ -246,7 +229,7 @@ class DownloadTask(
                     req.reset()
                 }
                 req.status = Status.FAILED
-                listener.onError(e.toString())
+                listener.onError(req, e.toString())
                 return@withContext
             } finally {
                 closeAllSafely(outputStream)
