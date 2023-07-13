@@ -54,7 +54,7 @@ class AppDownloadListener {
         listener: ListenerReference
     ): Int {
         val id = UUID.randomUUID().hashCode()
-        listeners.putIfAbsent(id, listener.copy(listenerId = id))
+        listeners[id] = listener.copy(listenerId = id)
         return id
     }
 
