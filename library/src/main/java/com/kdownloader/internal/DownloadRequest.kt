@@ -5,7 +5,6 @@ import com.kdownloader.Status
 import com.kdownloader.internal.listener.DownloadListener
 import com.kdownloader.utils.getUniqueId
 import kotlinx.coroutines.Job
-import java.io.File
 
 class DownloadRequest private constructor(
     val downloadId: Int,
@@ -29,8 +28,6 @@ class DownloadRequest private constructor(
         private val url: String,
         private val filePath: String,
     ) {
-
-        constructor(url: String, file: File) : this(url, file.absolutePath)
 
         private var tag: String? = null
         private var listener: DownloadListener? = null

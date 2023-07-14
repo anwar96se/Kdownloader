@@ -34,16 +34,18 @@ class KDownloader private constructor(
     private val downloader = DownloadDispatchers(dbHelper, context)
     private val reqQueue = DownloadRequestQueue(downloader)
 
-    fun newRequestBuilder(url: String, dirPath: String, fileName: String): DownloadRequest.Builder {
-        return DownloadRequest.Builder(url, File(dirPath, fileName))
+    fun newRequestBuilder(url: String, filePath: String): DownloadRequest.Builder {
+        return DownloadRequest.Builder(url, filePath)
             .readTimeout(config.readTimeOut)
             .connectTimeout(config.connectTimeOut)
     }
 
+    fun newRequestBuilder(url: String, file: File): DownloadRequest.Builder {
+        return newRequestBuilder(url, file.absolutePath)
+    }
+
     fun newRequestBuilder(url: String, uri: Uri): DownloadRequest.Builder {
-        return DownloadRequest.Builder(url, uri.toString())
-            .readTimeout(config.readTimeOut)
-            .connectTimeout(config.connectTimeOut)
+        return newRequestBuilder(url, uri.toString())
     }
 
     fun enqueue(req: DownloadRequest, listener: DownloadListener): Int {
