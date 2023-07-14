@@ -8,12 +8,12 @@ import kotlinx.coroutines.Job
 import java.io.File
 
 class DownloadRequest private constructor(
+    val downloadId: Int,
+    val tag: String?,
     internal var url: String,
-    internal val tag: String?,
     internal var listener: DownloadListener?,
     internal val headers: HashMap<String, List<String>>?,
     internal val filePath: String,
-    internal val downloadId: Int,
     internal var enqueueAction: Int,
     internal var status: Status = Status.UNKNOWN,
     internal var readTimeOut: Int = 0,
