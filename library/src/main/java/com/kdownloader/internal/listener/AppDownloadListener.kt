@@ -63,6 +63,10 @@ class AppDownloadListener {
             listeners.remove(listenerId)
     }
 
+    fun getAllListeners() = mutableMapOf<Int, ListenerReference>().apply {
+        putAll(listeners)
+    }.toMap()
+
     interface Listener {
         fun onStart(req: DownloadRequest)
         fun onProgress(req: DownloadRequest, progress: Int)

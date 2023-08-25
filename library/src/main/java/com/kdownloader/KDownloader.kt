@@ -127,4 +127,6 @@ class KDownloader private constructor(
 
     fun removeListener(listenerId: Int) = downloader.appListener.removeListener(listenerId)
 
+    fun getAllListeners() = downloader.appListener.getAllListeners()
+
 }
