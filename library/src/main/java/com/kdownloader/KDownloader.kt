@@ -101,6 +101,7 @@ class KDownloader private constructor(
 
     inline fun addListener(
         requestId: Int? = null,
+        tag: String? = null,
         removeOnFinish: Boolean = false,
         crossinline onStart: () -> Unit = {},
         crossinline onProgress: (total: Long, downloaded: Long, progress: Int) -> Unit = { _, _, _ -> },
@@ -110,6 +111,7 @@ class KDownloader private constructor(
     ) = addListener(
         ListenerReference(
             requestId = requestId,
+            tag = tag,
             removeOnFinish = removeOnFinish,
             listener = object : DownloadListener {
                 override fun onStart(req: DownloadRequest) = onStart()
@@ -127,6 +129,10 @@ class KDownloader private constructor(
 
     fun removeListener(listenerId: Int) = downloader.appListener.removeListener(listenerId)
 
+    fun removeListenersByTag(tag: String) = downloader.appListener.removeListenersByTag(tag)
+
     fun getAllListeners() = downloader.appListener.getAllListeners()
+
+    fun getListenersByTag(tag: String) = downloader.appListener.getListenersByTag(tag)
 
 }

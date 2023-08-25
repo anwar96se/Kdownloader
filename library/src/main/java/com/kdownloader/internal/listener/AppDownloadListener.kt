@@ -63,9 +63,13 @@ class AppDownloadListener {
             listeners.remove(listenerId)
     }
 
-    fun getAllListeners() = mutableMapOf<Int, ListenerReference>().apply {
-        putAll(listeners)
-    }.toMap()
+    fun removeListenersByTag(tag: String) {
+        listeners.filter { it.value.tag == tag }.forEach { listeners.remove(it.key) }
+    }
+
+    fun getAllListeners() = listeners.toMap()
+
+    fun getListenersByTag(tag: String) = listeners.filter { it.value.tag == tag }
 
     interface Listener {
         fun onStart(req: DownloadRequest)
@@ -81,6 +85,7 @@ typealias DownloadListener = AppDownloadListener.Listener
 data class ListenerReference(
     val listenerId: Int = 0,
     val requestId: Int? = null,
+    val tag: String? = null,
     val removeOnFinish: Boolean = false,
     val listener: DownloadListener,
 )
