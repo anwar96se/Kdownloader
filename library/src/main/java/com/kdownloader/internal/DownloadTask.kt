@@ -115,9 +115,9 @@ class DownloadTask(
                 httpClient = getRedirectedConnectionIfAny(httpClient, req)
                 responseCode = httpClient.getResponseCode()
 
-                if (!isSuccessful()) {
-                    listener.onError(req, "Wrong link")
-                }
+//                if (!isSuccessful()) {
+//                    listener.onError(req, "Wrong link")
+//                }
 
                 setResumeSupportedOrNot()
 
