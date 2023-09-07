@@ -131,8 +131,14 @@ class KDownloader private constructor(
 
     fun removeListenersByTag(tag: String) = downloader.appListener.removeListenersByTag(tag)
 
+    fun removeListenersByRequestId(requestId: Int? = null) =
+        downloader.appListener.removeListenersByRequestId(requestId)
+
     fun getAllListeners() = downloader.appListener.getAllListeners()
 
     fun getListenersByTag(tag: String) = downloader.appListener.getListenersByTag(tag)
+
+    fun getListenersByRequestId(requestId: Int? = null) =
+        downloader.appListener.getListenersByRequestId(requestId)
 
 }

@@ -67,9 +67,16 @@ class AppDownloadListener {
         listeners.filter { it.value.tag == tag }.forEach { listeners.remove(it.key) }
     }
 
+    fun removeListenersByRequestId(requestId: Int? = null) {
+        listeners.filter { it.value.requestId == requestId }.forEach { listeners.remove(it.key) }
+    }
+
     fun getAllListeners() = listeners.toMap()
 
     fun getListenersByTag(tag: String) = listeners.filter { it.value.tag == tag }
+
+    fun getListenersByRequestId(requestId: Int? = null) =
+        listeners.filter { it.value.requestId == requestId }
 
     interface Listener {
         fun onStart(req: DownloadRequest)
